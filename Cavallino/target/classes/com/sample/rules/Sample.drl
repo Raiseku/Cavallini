@@ -1,0 +1,967 @@
+package com.sample.rules
+ 
+import com.sample.Deck;
+import com.sample.Main_Cavallino;
+import com.sample.Giocatore;
+import com.sample.Step;
+import com.sample.Cavallo;
+import com.sample.Cavallo_vincitore;
+import com.sample.Gioco;
+import com.sample.Jolly;
+
+import java.util.*; 
+import java.lang.*;
+import java.util.Arrays;
+import java.util.concurrent.TimeUnit;
+
+
+rule "Genera Deck e Step"
+	when
+		d: Deck()
+		g: Gioco(attivo == true)
+		
+	then
+		System.out.println("-> Regola Genera Deck e Step");
+		Random rand = new Random();
+
+		List<String> list = new LinkedList<String>(Arrays.asList(d.getDeck()));  //Dichiaro una lista di carte
+		List<String> lista_carte_in_step = new LinkedList<>(); //Dichiaro la lista che conterrà le carte negli step 
+		
+		 //Un iterazione per ogni Step
+		for (int i = 1; i < 7; i++) {
+	        int randomIndex = rand.nextInt(list.size()); // Ottengo un indice random dalla lista del deck
+       		String temp = list.get(randomIndex); // Mi salvo il valore ottenuto in una stringa
+       		
+       		//Aggiungo la carta ottenuta a caso nella lista delle carte degli step
+	        lista_carte_in_step.add(temp);
+	        
+			//Tolgo la carta scelta dal deck primario
+			list.remove(randomIndex);
+			
+	    }
+	       
+		System.out.println("Deck mazzo: "+list);
+		System.out.println("Deck Step : "+lista_carte_in_step);
+		
+		//Adesso dentro list c'è il nuovo deck da 34 carte quindi aggiorno il deck con le carte rimanenti
+		String[] deck_34 = list.toArray(new String[list.size()]);
+		String[] carte_Step = lista_carte_in_step.toArray(new String[lista_carte_in_step.size()]);
+		
+		d.setDeck(deck_34);
+		d.setCarte_Step(carte_Step);
+
+end
+
+rule "Regola Jolly"
+	when
+		cavallo_cuori: Cavallo(seme=="♥️", pos_cuori: posizione, da_muovere==false )
+		cavallo_quadri: Cavallo(seme=="♦️", pos_quadri: posizione, da_muovere==false  )
+		cavallo_fiori: Cavallo(seme=="♣️", pos_fiori: posizione, da_muovere==false  )
+		cavallo_picche: Cavallo(seme=="♠️", pos_picche: posizione, da_muovere==false  )
+		jolly: Jolly(seme_jolly: seme_jolly, girato == true)
+		step: Step(seme: getSeme(), valore_step: getValore(), da_girare == false, posizione : getPosizione())
+		
+		g: Gioco(attivo == true)
+		d: Deck()
+	
+	then
+	
+		//System.out.println("\n");
+		//System.out.println("-> Regola Jolly !");
+		
+		int prima_posizione = 7;
+		int posizione_attuale_cuori = pos_cuori;
+		int posizione_attuale_quadri = pos_quadri;
+		int posizione_attuale_fiori = pos_fiori;
+		int posizione_attuale_picche = pos_picche;
+		int posizione_step = posizione;
+		
+		//Ottengo la lista di carte degli step
+		List<String> carte_step = new LinkedList<String>(Arrays.asList(d.getCarte_Step())); 
+
+		
+		if("♥️".contains(seme_jolly)){
+			jolly.setGirato(true);
+			update(jolly);
+			cavallo_cuori.setDa_muovere(true);
+			update(cavallo_cuori);
+ 
+		} else if("♦️".contains(seme_jolly)){
+			
+			jolly.setGirato(true);
+			update(jolly);
+			cavallo_quadri.setDa_muovere(true);
+			update(cavallo_quadri);
+
+		} else if("♣️".contains(seme_jolly)){
+		
+			jolly.setGirato(true);
+			update(jolly);
+			cavallo_fiori.setDa_muovere(true);
+			update(cavallo_fiori);	
+
+
+		} else if("♠️".contains(seme_jolly)){
+			
+			jolly.setGirato(true);
+			update(jolly);
+			cavallo_picche.setDa_muovere(true);
+			update(cavallo_picche);	
+		}
+		
+end
+
+
+// Quando una carta viene girata dal mazzo, si muove di una singola posizione il cavallo dello stesso seme della carta
+rule "Regola Gira carta mazzo"
+	when
+		cavallo_cuori: Cavallo(seme=="♥️", pos_cuori: posizione, da_muovere==false )
+		cavallo_quadri: Cavallo(seme=="♦️", pos_quadri: posizione,da_muovere==false )
+		cavallo_fiori: Cavallo(seme=="♣️", pos_fiori: posizione,da_muovere==false )
+		cavallo_picche: Cavallo(seme=="♠️", pos_picche: posizione,da_muovere==false )
+		step: Step(seme: seme, posizione: getPosizione(), da_girare == false)
+		jolly: Jolly(seme_jolly: seme_jolly, girato == false)
+		g: Gioco(attivo == true)
+		d: Deck()
+
+	then
+		System.out.println("\n");
+		System.out.println("-> Regola Gira carta mazzo______________________________________________________________");
+		
+		// Ottengo il mazzo da cui girare la carta
+		List<String> mazzo = new LinkedList<String>(Arrays.asList(d.getDeck())); 
+		
+		if (mazzo != null && mazzo.isEmpty()) { System.out.println("Il mazzo è finito!"); }
+		
+		
+		// Prendo la prima carta del mazzo
+		String carta_uscita = mazzo.get(0); 
+		System.out.println("Carta uscita: [" +carta_uscita+ "]");
+		
+		//Ottengo la lista di carte degli step
+		List<String> carte_step = new LinkedList<String>(Arrays.asList(d.getCarte_Step())); 
+		
+		//Dichiaro le posizione dei cavalli e la posizione vincitrice
+		int prima_posizione = 7;
+		int posizione_attuale_cuori;
+		int posizione_attuale_quadri;
+		int posizione_attuale_fiori;
+		int posizione_attuale_picche;
+		
+		//Ottengo quanti step sono stati girati fino ad adesso
+		int posizione_step = posizione;
+	
+		String valore_carta = String.valueOf(carta_uscita.charAt(0));	
+		String seme_carta = String.valueOf(carta_uscita.charAt(1));
+		
+		if(valore_carta.equals("J")){
+			
+			jolly.setSeme_jolly(seme_carta);
+			jolly.setGirato(true);
+			update(jolly);
+		} else {
+
+			// Se la carta uscita contiene il seme di cuori si muove il cavallo di cuori
+			if(carta_uscita.contains("♥️")){
+				cavallo_cuori.setDa_muovere(true);
+				update(cavallo_cuori);
+				
+			} else if(carta_uscita.contains("♦️")){
+				cavallo_quadri.setDa_muovere(true);
+				update(cavallo_quadri);
+			
+			} else if(carta_uscita.contains("♣️")){
+				cavallo_fiori.setDa_muovere(true);
+				update(cavallo_fiori);
+			} else if(carta_uscita.contains("♠️")){
+				cavallo_picche.setDa_muovere(true);
+				update(cavallo_picche);
+		}
+		}
+		//Una volta che uno dei cavalli ha avanzato rimuovo la prima carta del mazzo
+		mazzo.remove(carta_uscita);
+		String[] mazzo_aggiornato = mazzo.toArray(new String[mazzo.size()]);
+		System.out.println("Deck rimanente: "+Arrays.toString(mazzo_aggiornato));
+		d.setDeck(mazzo_aggiornato);
+		
+		
+		//Togliere il commento per far passare 2 secondi da una carta all'altra
+		//TimeUnit.SECONDS.sleep(5);
+
+		
+end
+
+rule "Regola muovi cavallo cuori"
+	when
+	cavallo_cuori: Cavallo(seme=="♥️", pos_cuori: posizione, da_muovere==true )
+		cavallo_quadri: Cavallo(seme=="♦️", pos_quadri: posizione,da_muovere==false )
+		cavallo_fiori: Cavallo(seme=="♣️", pos_fiori: posizione,da_muovere==false )
+		cavallo_picche: Cavallo(seme=="♠️", pos_picche: posizione,da_muovere==false )
+		step: Step(seme: seme, posizione: getPosizione(), da_girare == false)
+		jolly: Jolly(seme_jolly: seme_jolly, girato == false)
+		g: Gioco(attivo == true)
+		d: Deck()
+	then
+		//Dichiaro le posizione dei cavalli e la posizione vincitrice
+		int prima_posizione = 7;
+		int posizione_attuale_cuori;
+		int posizione_attuale_quadri;
+		int posizione_attuale_fiori;
+		int posizione_attuale_picche;
+		
+		//Ottengo quanti step sono stati girati fino ad adesso
+		int posizione_step = posizione;
+		
+		//Ottengo la lista di carte degli step
+		List<String> carte_step = new LinkedList<String>(Arrays.asList(d.getCarte_Step()));  
+				System.out.println("Il cavallo di ♥️ avanza!");
+				
+				//Ottengo e aggiorno la posizione del cavallo
+				posizione_attuale_cuori = pos_cuori;
+				posizione_attuale_cuori+=1;
+				cavallo_cuori.setPosizione(posizione_attuale_cuori);
+				System.out.println("Posizione del cavallo di ♥️: ["+pos_cuori+ "] -> ["+posizione_attuale_cuori+"]");
+				System.out.println("Posizione del cavallo di ♦️: ["+pos_quadri+"]");
+				System.out.println("Posizione del cavallo di ♣️: ["+pos_fiori+"]");
+				System.out.println("Posizione del cavallo di ♠️: ["+pos_picche+"]");
+				
+				//Se il cavallo arriva in prima_posizione il gioco termina
+				if(posizione_attuale_cuori == prima_posizione){
+					//Inseriamo il cavallo di cuori come vincitore
+					insert(new Cavallo_vincitore(cavallo_cuori.seme));
+					g.setAttivo(false);
+					update(g);
+					
+				} else {
+					//Se tutti i cavalli passano la posizione dello step allora giro la carta dello step
+					if(cavallo_cuori.getPosizione() > posizione_step &&
+					   cavallo_quadri.getPosizione() > posizione_step &&
+					   cavallo_fiori.getPosizione() > posizione_step &&
+					   cavallo_picche.getPosizione() > posizione_step){
+						
+						//Prendo la prima carta della lista degli step
+						String carta_step = carte_step.get(0);
+						//Rimuovo la carta della lista degli step
+						carte_step.remove(carta_step);
+						
+						//Aggiorno la lista degli step con il nuovo mazzo
+						String[] mazzo_step_aggiornato = carte_step.toArray(new String[carte_step.size()]);
+						d.setCarte_Step(mazzo_step_aggiornato);
+						
+						// Prendo il seme ed il valore della carta dello step
+						String valore_step = String.valueOf(carta_step.charAt(0));
+						String seme_step = String.valueOf(carta_step.charAt(1));					
+						System.out.println("Tutti i cavalli hanno superato lo step: ["+posizione_step+"]");
+						
+						//Aggiorno la posizione, il seme ed il booleano dello step
+						posizione_step+=1;
+						step.setValore(valore_step);
+						step.setSeme(seme_step); 
+						step.setPosizione(posizione_step); 
+						step.setDa_girare(true);
+						
+						cavallo_cuori.setDa_muovere(false);
+						update(cavallo_cuori);
+						//Rivaluto tutte le regole che hanno step nella condizione when.
+						update(step);
+	
+					} else {
+					
+						//Se nessuno step è stato triggherato allora rivaluto la regola con la nuova posizione del cavallo
+						cavallo_cuori.setDa_muovere(false);
+						update(cavallo_cuori);
+					}
+				}
+end
+
+rule "Regola muovi cavallo quadri"
+	when
+	cavallo_cuori: Cavallo(seme=="♥️", pos_cuori: posizione, da_muovere==false )
+		cavallo_quadri: Cavallo(seme=="♦️", pos_quadri: posizione,da_muovere==true )
+		cavallo_fiori: Cavallo(seme=="♣️", pos_fiori: posizione,da_muovere==false )
+		cavallo_picche: Cavallo(seme=="♠️", pos_picche: posizione,da_muovere==false )
+		step: Step(seme: seme, posizione: getPosizione(), da_girare == false)
+		jolly: Jolly(seme_jolly: seme_jolly, girato == false)
+		g: Gioco(attivo == true)
+		d: Deck()
+	then
+		//Dichiaro le posizione dei cavalli e la posizione vincitrice
+		int prima_posizione = 7;
+		int posizione_attuale_cuori;
+		int posizione_attuale_quadri;
+		int posizione_attuale_fiori;
+		int posizione_attuale_picche;
+		
+		//Ottengo quanti step sono stati girati fino ad adesso
+		int posizione_step = posizione;
+		
+		//Ottengo la lista di carte degli step
+		List<String> carte_step = new LinkedList<String>(Arrays.asList(d.getCarte_Step()));  
+			System.out.println("Il cavallo di ♦️ avanza!");
+				posizione_attuale_quadri = pos_quadri;
+				posizione_attuale_quadri+=1;
+				cavallo_quadri.setPosizione(posizione_attuale_quadri);
+				System.out.println("Posizione del cavallo di ♥️: ["+pos_cuori+"]");
+				System.out.println("Posizione del cavallo di ♦️: ["+pos_quadri+"] -> ["+posizione_attuale_quadri+"]");
+				System.out.println("Posizione del cavallo di ♣️: ["+pos_fiori+"]");
+				System.out.println("Posizione del cavallo di ♠️: ["+pos_picche+"]");
+				
+				if(posizione_attuale_quadri == prima_posizione){
+					insert(new Cavallo_vincitore(cavallo_quadri.seme));
+					g.setAttivo(false);
+					update(g);
+				} else {
+					if(cavallo_cuori.getPosizione() > posizione_step &&
+					   cavallo_quadri.getPosizione() > posizione_step &&
+					   cavallo_fiori.getPosizione() > posizione_step &&
+					   cavallo_picche.getPosizione() > posizione_step){
+	
+						String carta_step = carte_step.get(0);
+						carte_step.remove(carta_step);
+						String[] mazzo_step_aggiornato = carte_step.toArray(new String[carte_step.size()]);
+						d.setCarte_Step(mazzo_step_aggiornato);
+					
+						// Prendo il seme ed il valore della carta dello step
+						String valore_step = String.valueOf(carta_step.charAt(0));
+						String seme_step = String.valueOf(carta_step.charAt(1));					
+						System.out.println("Tutti i cavalli hanno superato lo step: ["+posizione_step+"]");
+						
+						//Aggiorno la posizione, il seme ed il booleano dello step
+						posizione_step+=1;
+						step.setValore(valore_step);
+						step.setSeme(seme_step); 
+						step.setPosizione(posizione_step); 
+						step.setDa_girare(true);
+						
+						cavallo_quadri.setDa_muovere(false);
+						update(cavallo_quadri);
+						//Rivaluto tutte le regole che hanno step nella condizione when.
+						update(step);
+	
+					} else {
+					cavallo_quadri.setDa_muovere(false);
+						update(cavallo_quadri);
+					}
+					
+			}	
+end
+rule "Regola muovi cavallo fiori"
+	when
+	cavallo_cuori: Cavallo(seme=="♥️", pos_cuori: posizione, da_muovere==false )
+		cavallo_quadri: Cavallo(seme=="♦️", pos_quadri: posizione,da_muovere==false )
+		cavallo_fiori: Cavallo(seme=="♣️", pos_fiori: posizione,da_muovere==true )
+		cavallo_picche: Cavallo(seme=="♠️", pos_picche: posizione,da_muovere==false )
+		step: Step(seme: seme, posizione: getPosizione(), da_girare == false)
+		jolly: Jolly(seme_jolly: seme_jolly, girato == false)
+		g: Gioco(attivo == true)
+		d: Deck()
+	then
+		//Dichiaro le posizione dei cavalli e la posizione vincitrice
+		int prima_posizione = 7;
+		int posizione_attuale_cuori;
+		int posizione_attuale_quadri;
+		int posizione_attuale_fiori;
+		int posizione_attuale_picche;
+		
+		//Ottengo quanti step sono stati girati fino ad adesso
+		int posizione_step = posizione;
+		
+		//Ottengo la lista di carte degli step
+		List<String> carte_step = new LinkedList<String>(Arrays.asList(d.getCarte_Step()));  
+		System.out.println("Il cavallo di ♣️ avanza!");
+		posizione_attuale_fiori = pos_fiori;
+		posizione_attuale_fiori+=1;
+		cavallo_fiori.setPosizione(posizione_attuale_fiori);
+		System.out.println("Posizione del cavallo di ♥️: ["+pos_cuori+"]");
+		System.out.println("Posizione del cavallo di ♦️: ["+pos_quadri+"]");
+		System.out.println("Posizione del cavallo di ♣️: ["+pos_fiori+"] -> ["+posizione_attuale_fiori+"]");
+		System.out.println("Posizione del cavallo di ♠️: ["+pos_picche+"]");
+	
+		if(posizione_attuale_fiori == prima_posizione){
+			insert(new Cavallo_vincitore(cavallo_fiori.seme));
+			g.setAttivo(false);
+			update(g);
+		} else {
+			if(cavallo_cuori.getPosizione() > posizione_step &&
+			   cavallo_quadri.getPosizione() > posizione_step &&
+			   cavallo_fiori.getPosizione() > posizione_step &&
+			   cavallo_picche.getPosizione() > posizione_step){
+				
+				String carta_step = carte_step.get(0);
+				carte_step.remove(carta_step);
+				String[] mazzo_step_aggiornato = carte_step.toArray(new String[carte_step.size()]);
+				d.setCarte_Step(mazzo_step_aggiornato);
+				
+				// Prendo il seme ed il valore della carta dello step
+				String valore_step = String.valueOf(carta_step.charAt(0));
+				String seme_step = String.valueOf(carta_step.charAt(1));					
+				System.out.println("Tutti i cavalli hanno superato lo step: ["+posizione_step+"]");
+				
+				//Aggiorno la posizione, il seme ed il booleano dello step
+				posizione_step+=1;
+				step.setValore(valore_step);
+				step.setSeme(seme_step); 
+				step.setPosizione(posizione_step); 
+				step.setDa_girare(true);
+				
+				cavallo_fiori.setDa_muovere(false);
+				update(cavallo_fiori);
+				//Rivaluto tutte le regole che hanno step nella condizione when.
+				update(step);
+
+
+			} else {
+			cavallo_fiori.setDa_muovere(false);
+				update(cavallo_fiori);
+			}
+			}
+			
+end
+rule "Regola muovi cavallo picche"
+	when
+	cavallo_cuori: Cavallo(seme=="♥️", pos_cuori: posizione, da_muovere==false )
+		cavallo_quadri: Cavallo(seme=="♦️", pos_quadri: posizione,da_muovere==false )
+		cavallo_fiori: Cavallo(seme=="♣️", pos_fiori: posizione,da_muovere==false )
+		cavallo_picche: Cavallo(seme=="♠️", pos_picche: posizione,da_muovere==true )
+		step: Step(seme: seme, posizione: getPosizione(), da_girare == false)
+		jolly: Jolly(seme_jolly: seme_jolly, girato == false)
+		g: Gioco(attivo == true)
+		d: Deck()
+	then
+		//Dichiaro le posizione dei cavalli e la posizione vincitrice
+		int prima_posizione = 7;
+		int posizione_attuale_cuori;
+		int posizione_attuale_quadri;
+		int posizione_attuale_fiori;
+		int posizione_attuale_picche;
+		
+		//Ottengo quanti step sono stati girati fino ad adesso
+		int posizione_step = posizione;
+		
+		//Ottengo la lista di carte degli step
+		List<String> carte_step = new LinkedList<String>(Arrays.asList(d.getCarte_Step()));  
+			System.out.println("Il cavallo di ♠️ avanza!");
+				posizione_attuale_picche = pos_picche;
+				posizione_attuale_picche+=1;
+				cavallo_picche.setPosizione(posizione_attuale_picche);
+				System.out.println("Posizione del cavallo di ♥️: ["+pos_cuori+"]");
+				System.out.println("Posizione del cavallo di ♦️: ["+pos_quadri+"]");
+				System.out.println("Posizione del cavallo di ♣️: ["+pos_fiori+"]");
+				System.out.println("Posizione del cavallo di ♠️: ["+pos_picche+"] -> ["+posizione_attuale_picche+"]");
+				
+				if(posizione_attuale_picche == prima_posizione){
+					insert(new Cavallo_vincitore(cavallo_picche.seme));
+					g.setAttivo(false);
+					update(g);
+				} else {
+					if(cavallo_cuori.getPosizione() > posizione_step &&
+					   cavallo_quadri.getPosizione() > posizione_step &&
+					   cavallo_fiori.getPosizione() > posizione_step &&
+					   cavallo_picche.getPosizione() > posizione_step){
+	
+						String carta_step = carte_step.get(0);
+						carte_step.remove(carta_step);
+						String[] mazzo_step_aggiornato = carte_step.toArray(new String[carte_step.size()]);
+						d.setCarte_Step(mazzo_step_aggiornato);
+						
+						// Prendo il seme ed il valore della carta dello step
+						String valore_step = String.valueOf(carta_step.charAt(0));
+						String seme_step = String.valueOf(carta_step.charAt(1));					
+						System.out.println("Tutti i cavalli hanno superato lo step: ["+posizione_step+"]");
+						
+						//Aggiorno la posizione, il seme ed il booleano dello step
+						posizione_step+=1;
+						step.setValore(valore_step);
+						step.setSeme(seme_step); 
+						step.setPosizione(posizione_step); 
+						step.setDa_girare(true);
+						
+						cavallo_picche.setDa_muovere(false);
+						update(cavallo_picche);
+						//Rivaluto tutte le regole che hanno step nella condizione when.
+						update(step);
+	
+					} else {
+					cavallo_picche.setDa_muovere(false);
+						update(cavallo_picche);
+					}
+			
+			}
+		
+			
+end
+
+rule "Regola muovi cavallo cuori tramite jolly"
+	when
+	cavallo_cuori: Cavallo(seme=="♥️", pos_cuori: posizione, da_muovere==true )
+		cavallo_quadri: Cavallo(seme=="♦️", pos_quadri: posizione,da_muovere==false )
+		cavallo_fiori: Cavallo(seme=="♣️", pos_fiori: posizione,da_muovere==false )
+		cavallo_picche: Cavallo(seme=="♠️", pos_picche: posizione,da_muovere==false )
+		step: Step(seme: seme, posizione: getPosizione(), da_girare == false)
+		jolly: Jolly(seme_jolly: seme_jolly, girato == true)
+		g: Gioco(attivo == true)
+		d: Deck()
+	then
+		System.out.println("\n");
+		System.out.println("-> Regola Jolly cuore !");
+		
+		int prima_posizione = 7;
+		int posizione_attuale_cuori = pos_cuori;
+		int posizione_attuale_quadri = pos_quadri;
+		int posizione_attuale_fiori = pos_fiori;
+		int posizione_attuale_picche = pos_picche;
+		int posizione_step = posizione;
+		
+		//Ottengo la lista di carte degli step
+		List<String> carte_step = new LinkedList<String>(Arrays.asList(d.getCarte_Step()));  
+					posizione_attuale_cuori+=1;
+			if(posizione_attuale_quadri==0){posizione_attuale_quadri=0;} else {posizione_attuale_quadri-=1;}
+			if(posizione_attuale_fiori==0){posizione_attuale_fiori=0;} else {posizione_attuale_fiori-=1;}
+			if(posizione_attuale_picche==0){posizione_attuale_picche=0;} else {posizione_attuale_picche-=1;}
+			
+			cavallo_cuori.setPosizione(posizione_attuale_cuori);
+			cavallo_quadri.setPosizione(posizione_attuale_quadri);
+			cavallo_fiori.setPosizione(posizione_attuale_fiori);
+			cavallo_picche.setPosizione(posizione_attuale_picche);
+			
+			System.out.println("Il cavallo di ♥️ avanza e tutti gli altri indietreggiano!");
+			System.out.println("Posizione del cavallo di ♥️: ["+pos_cuori+ "] -> ["+posizione_attuale_cuori+"]");
+			System.out.println("Posizione del cavallo di ♦️: ["+posizione_attuale_quadri+"] <- ["+pos_quadri+"]");
+			System.out.println("Posizione del cavallo di ♣️: ["+posizione_attuale_fiori+"] <- ["+pos_fiori+"]");
+			System.out.println("Posizione del cavallo di ♠️: ["+posizione_attuale_picche+"] <- ["+pos_picche+"]");
+			
+			//Se il cavallo arriva in prima_posizione il gioco termina
+			if(posizione_attuale_cuori == prima_posizione){
+				//Inseriamo il cavallo di cuori come vincitore
+				insert(new Cavallo_vincitore(cavallo_cuori.seme));
+				g.setAttivo(false);
+				update(g);
+			} else {
+					//Se tutti i cavalli passano la posizione dello step allora giro la carta dello step
+					if(cavallo_cuori.getPosizione() > posizione_step &&
+					   cavallo_quadri.getPosizione() > posizione_step &&
+					   cavallo_fiori.getPosizione() > posizione_step &&
+					   cavallo_picche.getPosizione() > posizione_step) {
+						
+						String carta_step = carte_step.get(0);
+						carte_step.remove(carta_step);
+						String[] mazzo_step_aggiornato = carte_step.toArray(new String[carte_step.size()]);
+						d.setCarte_Step(mazzo_step_aggiornato);
+						
+						String valore_step_da_step = String.valueOf(carta_step.charAt(0));
+						String seme_step_da_step = String.valueOf(carta_step.charAt(1));	
+						
+						System.out.println("Il jolly fa scoprire uno Step!");	
+								
+						System.out.println("Tutti i cavalli hanno superato lo step: ["+posizione_step+"]");
+						
+						posizione_step+=1;
+						step.setValore(valore_step_da_step);
+						step.setSeme(seme_step_da_step); 
+						step.setPosizione(posizione_step); 
+						step.setDa_girare(true);
+						jolly.setGirato(false);
+						cavallo_cuori.setDa_muovere(false);
+						update(cavallo_cuori);
+						update(jolly);
+						update(step);
+	
+					} else {
+					
+						//Se nessuno step è stato triggherato allora rivaluto la regola con la nuova posizione del cavallo
+						jolly.setGirato(false);
+						cavallo_cuori.setDa_muovere(false);
+						update(cavallo_cuori);
+						update(jolly);
+						
+					}
+				}
+end
+rule "Regola muovi cavallo quadri tramite jolly"
+	when
+	cavallo_cuori: Cavallo(seme=="♥️", pos_cuori: posizione, da_muovere==false )
+		cavallo_quadri: Cavallo(seme=="♦️", pos_quadri: posizione,da_muovere==true )
+		cavallo_fiori: Cavallo(seme=="♣️", pos_fiori: posizione,da_muovere==false )
+		cavallo_picche: Cavallo(seme=="♠️", pos_picche: posizione,da_muovere==false )
+		step: Step(seme: seme, posizione: getPosizione(), da_girare == false)
+		jolly: Jolly(seme_jolly: seme_jolly, girato == true)
+		g: Gioco(attivo == true)
+		d: Deck()
+	then
+		System.out.println("\n");
+		System.out.println("-> Regola Jolly quadri !");
+		
+		int prima_posizione = 7;
+		int posizione_attuale_cuori = pos_cuori;
+		int posizione_attuale_quadri = pos_quadri;
+		int posizione_attuale_fiori = pos_fiori;
+		int posizione_attuale_picche = pos_picche;
+		int posizione_step = posizione;
+		
+		//Ottengo la lista di carte degli step
+		List<String> carte_step = new LinkedList<String>(Arrays.asList(d.getCarte_Step()));  
+					posizione_attuale_quadri+=1;
+			if(posizione_attuale_cuori==0){posizione_attuale_cuori=0;} else {posizione_attuale_cuori-=1;}
+			if(posizione_attuale_fiori==0){posizione_attuale_fiori=0;} else {posizione_attuale_fiori-=1;}
+			if(posizione_attuale_picche==0){posizione_attuale_picche=0;} else {posizione_attuale_picche-=1;}
+			
+			cavallo_cuori.setPosizione(posizione_attuale_cuori);
+			cavallo_quadri.setPosizione(posizione_attuale_quadri);
+			cavallo_fiori.setPosizione(posizione_attuale_fiori);
+			cavallo_picche.setPosizione(posizione_attuale_picche);
+			
+			System.out.println("Il cavallo di ♦️ avanza e tutti gli altri indietreggiano!");
+			System.out.println("Posizione del cavallo di ♥️: ["+posizione_attuale_cuori+"] <- ["+pos_cuori+"]");
+			System.out.println("Posizione del cavallo di ♦️: ["+pos_quadri+ "] -> ["+posizione_attuale_quadri+"]");
+			System.out.println("Posizione del cavallo di ♣️: ["+posizione_attuale_fiori+"] <- ["+pos_fiori+"]");
+			System.out.println("Posizione del cavallo di ♠️: ["+posizione_attuale_picche+"] <- ["+pos_picche+"]");
+			
+			if(posizione_attuale_quadri == prima_posizione){
+					insert(new Cavallo_vincitore(cavallo_quadri.seme));
+					g.setAttivo(false);
+					update(g);
+				} else {
+					if(cavallo_cuori.getPosizione() > posizione_step &&
+					   cavallo_quadri.getPosizione() > posizione_step &&
+					   cavallo_fiori.getPosizione() > posizione_step &&
+					   cavallo_picche.getPosizione() > posizione_step){
+	
+						String carta_step = carte_step.get(0);
+						carte_step.remove(carta_step);
+						String[] mazzo_step_aggiornato = carte_step.toArray(new String[carte_step.size()]);
+						d.setCarte_Step(mazzo_step_aggiornato);
+						
+						String valore_step_da_step = String.valueOf(carta_step.charAt(0));
+						String seme_step_da_step = String.valueOf(carta_step.charAt(1));	
+						
+						System.out.println("Il jolly fa scoprire uno Step!");
+								
+						System.out.println("Tutti i cavalli hanno superato lo step: ["+posizione_step+"]");
+						
+						posizione_step+=1;
+						step.setValore(valore_step_da_step);
+						step.setSeme(seme_step_da_step); 
+						step.setPosizione(posizione_step); 
+						step.setDa_girare(true);
+						jolly.setGirato(false);
+						cavallo_quadri.setDa_muovere(false);
+						update(cavallo_quadri);
+						update(jolly);
+						update(step);
+	
+					} else {
+						jolly.setGirato(false);
+						cavallo_quadri.setDa_muovere(false);
+						update(cavallo_quadri);
+						update(jolly);
+						
+					}
+
+		}
+end
+
+rule "Regola muovi cavallo fiori tramite jolly"
+	when
+	cavallo_cuori: Cavallo(seme=="♥️", pos_cuori: posizione, da_muovere==false )
+		cavallo_quadri: Cavallo(seme=="♦️", pos_quadri: posizione,da_muovere==false )
+		cavallo_fiori: Cavallo(seme=="♣️", pos_fiori: posizione,da_muovere==true )
+		cavallo_picche: Cavallo(seme=="♠️", pos_picche: posizione,da_muovere==false )
+		step: Step(seme: seme, posizione: getPosizione(), da_girare == false)
+		jolly: Jolly(seme_jolly: seme_jolly, girato == true)
+		g: Gioco(attivo == true)
+		d: Deck()
+	then
+		System.out.println("\n");
+		System.out.println("-> Regola Jolly fiore !");
+		
+		int prima_posizione = 7;
+		int posizione_attuale_cuori = pos_cuori;
+		int posizione_attuale_quadri = pos_quadri;
+		int posizione_attuale_fiori = pos_fiori;
+		int posizione_attuale_picche = pos_picche;
+		int posizione_step = posizione;
+		
+		//Ottengo la lista di carte degli step
+		List<String> carte_step = new LinkedList<String>(Arrays.asList(d.getCarte_Step()));  
+					posizione_attuale_fiori+=1;
+			if(posizione_attuale_cuori==0){posizione_attuale_cuori=0;} else {posizione_attuale_cuori-=1;}
+			if(posizione_attuale_quadri==0){posizione_attuale_quadri=0;} else {posizione_attuale_quadri-=1;}
+			if(posizione_attuale_picche==0){posizione_attuale_picche=0;} else {posizione_attuale_picche-=1;}
+			
+			cavallo_cuori.setPosizione(posizione_attuale_cuori);
+			cavallo_quadri.setPosizione(posizione_attuale_quadri);
+			cavallo_fiori.setPosizione(posizione_attuale_fiori);
+			cavallo_picche.setPosizione(posizione_attuale_picche);
+			
+			System.out.println("Il cavallo di ♣️ avanza e tutti gli altri indietreggiano!");
+			System.out.println("Posizione del cavallo di ♥️: ["+posizione_attuale_cuori+"] <- ["+pos_cuori+"]");
+			System.out.println("Posizione del cavallo di ♦️: ["+posizione_attuale_quadri+"] <- ["+pos_quadri+"]");
+			System.out.println("Posizione del cavallo di ♣️: ["+pos_fiori+ "] -> ["+posizione_attuale_fiori+"]");
+			System.out.println("Posizione del cavallo di ♠️: ["+posizione_attuale_picche+"] <- ["+pos_picche+"]");
+
+		if(posizione_attuale_fiori == prima_posizione){
+					insert(new Cavallo_vincitore(cavallo_fiori.seme));
+					g.setAttivo(false);
+					update(g);
+				} else {
+					if(cavallo_cuori.getPosizione() > posizione_step &&
+					   cavallo_quadri.getPosizione() > posizione_step &&
+					   cavallo_fiori.getPosizione() > posizione_step &&
+					   cavallo_picche.getPosizione() > posizione_step){
+	
+						String carta_step = carte_step.get(0);
+						carte_step.remove(carta_step);
+						String[] mazzo_step_aggiornato = carte_step.toArray(new String[carte_step.size()]);
+						d.setCarte_Step(mazzo_step_aggiornato);
+						
+						String valore_step_da_step = String.valueOf(carta_step.charAt(0));
+						String seme_step_da_step = String.valueOf(carta_step.charAt(1));	
+						
+						System.out.println("Il jolly fa scoprire uno Step!");
+								
+						System.out.println("Tutti i cavalli hanno superato lo step: ["+posizione_step+"]");
+						
+						posizione_step+=1;
+						step.setValore(valore_step_da_step);
+						step.setSeme(seme_step_da_step); 
+						step.setPosizione(posizione_step); 
+						step.setDa_girare(true);
+						jolly.setGirato(false);
+						cavallo_fiori.setDa_muovere(false);
+						update(cavallo_fiori);
+						update(jolly);
+						update(step);
+	
+					} else {
+						jolly.setGirato(false);
+						cavallo_fiori.setDa_muovere(false);
+						update(cavallo_fiori);
+						update(jolly);
+						
+					}
+
+		}
+end
+
+
+rule "Regola muovi cavallo picche tramite jolly"
+	when
+	cavallo_cuori: Cavallo(seme=="♥️", pos_cuori: posizione, da_muovere==false )
+		cavallo_quadri: Cavallo(seme=="♦️", pos_quadri: posizione,da_muovere==false )
+		cavallo_fiori: Cavallo(seme=="♣️", pos_fiori: posizione,da_muovere==false )
+		cavallo_picche: Cavallo(seme=="♠️", pos_picche: posizione,da_muovere==true )
+		step: Step(seme: seme, posizione: getPosizione(), da_girare == false)
+		jolly: Jolly(seme_jolly: seme_jolly, girato == true)
+		g: Gioco(attivo == true)
+		d: Deck()
+	then
+		System.out.println("\n");
+		System.out.println("-> Regola Jolly picche !");
+		
+		int prima_posizione = 7;
+		int posizione_attuale_cuori = pos_cuori;
+		int posizione_attuale_quadri = pos_quadri;
+		int posizione_attuale_fiori = pos_fiori;
+		int posizione_attuale_picche = pos_picche;
+		int posizione_step = posizione;
+		
+		//Ottengo la lista di carte degli step
+		List<String> carte_step = new LinkedList<String>(Arrays.asList(d.getCarte_Step()));  
+					posizione_attuale_picche+=1;
+			if(posizione_attuale_cuori==0){posizione_attuale_cuori=0;} else {posizione_attuale_cuori-=1;}
+			if(posizione_attuale_quadri==0){posizione_attuale_quadri=0;} else {posizione_attuale_quadri-=1;}
+			if(posizione_attuale_fiori==0){posizione_attuale_fiori=0;} else {posizione_attuale_fiori-=1;}
+			
+			cavallo_cuori.setPosizione(posizione_attuale_cuori);
+			cavallo_quadri.setPosizione(posizione_attuale_quadri);
+			cavallo_fiori.setPosizione(posizione_attuale_fiori);
+			cavallo_picche.setPosizione(posizione_attuale_picche);
+			
+			System.out.println("Il cavallo di ♠️ avanza e tutti gli altri indietreggiano!");
+			System.out.println("Posizione del cavallo di ♥️: ["+posizione_attuale_cuori+"] <- ["+pos_cuori+"]");
+			System.out.println("Posizione del cavallo di ♦️: ["+posizione_attuale_quadri+"] <- ["+pos_quadri+"]");
+			System.out.println("Posizione del cavallo di ♣️: ["+posizione_attuale_fiori+"] <- ["+pos_fiori+"]");
+			System.out.println("Posizione del cavallo di ♠️: ["+pos_picche+ "] -> ["+posizione_attuale_picche+"]");
+
+
+			if(posizione_attuale_picche == prima_posizione){
+					insert(new Cavallo_vincitore(cavallo_picche.seme));
+					g.setAttivo(false);
+					update(g);
+				} else {
+					if(cavallo_cuori.getPosizione() > posizione_step &&
+					   cavallo_quadri.getPosizione() > posizione_step &&
+					   cavallo_fiori.getPosizione() > posizione_step &&
+					   cavallo_picche.getPosizione() > posizione_step){
+	
+						String carta_step = carte_step.get(0);
+						carte_step.remove(carta_step);
+						String[] mazzo_step_aggiornato = carte_step.toArray(new String[carte_step.size()]);
+						d.setCarte_Step(mazzo_step_aggiornato);
+						
+						String valore_step_da_step = String.valueOf(carta_step.charAt(0));
+						String seme_step_da_step = String.valueOf(carta_step.charAt(1));	
+						
+						System.out.println("Il jolly fa scoprire uno Step!");
+								
+						System.out.println("Tutti i cavalli hanno superato lo step: ["+posizione_step+"]");
+						
+						posizione_step+=1;
+						step.setValore(valore_step_da_step);
+						step.setSeme(seme_step_da_step); 
+						step.setPosizione(posizione_step); 
+						step.setDa_girare(true);
+						jolly.setGirato(false);
+						cavallo_picche.setDa_muovere(false);
+						update(cavallo_picche);
+						update(jolly);
+						update(step);
+					} else {
+						jolly.setGirato(false);
+						cavallo_picche.setDa_muovere(false);
+						update(cavallo_picche);
+						update(jolly);
+					}
+		}
+end
+// Quando tutti i cavalli superano lo step, quella carta viene girata ed il cavallo che ha lo stesso 
+// seme si muove in avanti
+// Quando va girata la carta dello step NON va girata la carta del mazzo
+rule "Gira carta step"
+	when
+		step: Step(seme_step: getSeme(), valore_step: getValore(), da_girare == true, posizione_step_attuale : getPosizione())
+		cavallo_cuori: Cavallo(seme=="♥️", pos_cuori: getPosizione())
+		cavallo_quadri: Cavallo(seme=="♦️", pos_quadri: getPosizione())
+		cavallo_fiori: Cavallo(seme=="♣️", pos_fiori: getPosizione())
+		cavallo_picche: Cavallo(seme=="♠️", pos_picche: getPosizione())
+		jolly: Jolly(seme_jolly: seme_jolly, girato == false)
+		g: Gioco(attivo == true)
+		d: Deck()
+	then
+		System.out.println("\n");
+		System.out.println("-> Si gira la carta dello step!");
+		
+		//Si ottengono le posizioni dei cavalli e si definisce la prima posizione 
+		int posizione_attuale_cuori = pos_cuori;
+		int posizione_attuale_quadri = pos_quadri;
+		int posizione_attuale_fiori = pos_fiori;
+		int posizione_attuale_picche = pos_picche;
+		int prima_posizione = 7;
+		
+		//Posizione dello step in cui è arrivato il gioco
+		int posizione_step = posizione_step_attuale;
+		
+		//Ottengo la lista di carte degli step
+		List<String> carte_step = new LinkedList<String>(Arrays.asList(d.getCarte_Step())); 
+		
+		System.out.println("Carta step: ["+ valore_step + seme_step +"]");
+		
+		
+		if(valore_step.equals("J")){
+			System.out.println("Il JOLLY era presente su uno step!");
+			step.setDa_girare(false);
+			jolly.setSeme_jolly(seme_step);
+			jolly.setGirato(true);
+			update(jolly);
+			update(step);
+			
+			
+		} else {
+		
+		
+			//Se la carta dello step contiene il seme di cuori allora fai avanzare il cavallo di cuori
+			if("♥️".contains(seme_step)){
+				step.setDa_girare(false);
+				update(step);
+				cavallo_cuori.setDa_muovere(true);
+				update(cavallo_cuori);
+				
+				
+			} else if("♦️".contains(seme_step)){
+				step.setDa_girare(false);
+				update(step);
+				cavallo_quadri.setDa_muovere(true);
+				update(cavallo_quadri);
+				
+			} else if("♣️".contains(seme_step)){
+				step.setDa_girare(false);
+				update(step);
+				cavallo_fiori.setDa_muovere(true);
+				update(cavallo_fiori);
+			
+			} else if("♠️".contains(seme_step)){
+				step.setDa_girare(false);
+				update(step);
+				cavallo_picche.setDa_muovere(true);
+				update(cavallo_picche);			
+			}
+		}
+		
+		
+		//TimeUnit.SECONDS.sleep(5);
+		
+end
+
+
+
+// Regola che si attiva quando è presente un cavallo vincitore ed il gioco è terminato 
+rule "Vittoria"
+	when
+		cavallo_vincitore: Cavallo_vincitore(seme_vincitore: seme_vincitore)
+		gioco: Gioco(attivo==false, giocatori: giocatori)
+
+	then
+	
+		System.out.println("\n\n________________VITTORIA________________\n");
+		//Stampiamo il cavallo vincitore e definiamo la lista dei vincitori
+		System.out.println("Il cavallo vincitore è quello di: ["+cavallo_vincitore.seme_vincitore+"] !");
+		int somma_vincita_totale = 0;
+		int somma_puntate_vincitrici= 0;
+		List<String> vincitori = new LinkedList<String>(); 
+		List<Integer> puntate_vincitori = new LinkedList<Integer>(); 
+		//For che scorre tutti i giocatori
+		for(int i = 0; i < giocatori.size(); i++){
+			Giocatore player = (Giocatore) giocatori.get(i);
+			
+			//Otteniamo le puntate fatte dai giocatori per ottenere la vincita totale
+			int singola_puntata = player.getPuntata();
+			somma_vincita_totale += singola_puntata; 
+			
+			// I vincitori sono tutti i giocatori che hanno puntato sullo stesso seme del cavallo
+			if((player.getScelta()).equals(seme_vincitore)){
+				vincitori.add(player.getNome());
+				puntate_vincitori.add(player.getPuntata());
+				
+				int singola_puntata_vincitore = player.getPuntata();
+				somma_puntate_vincitrici += singola_puntata_vincitore; 
+			}
+		}
+		
+		System.out.println("Nome dei vincitori: "+vincitori);
+		System.out.println("Totale delle scommesse: "+somma_vincita_totale);
+		int numero_vincitori = vincitori.size();
+		
+		//Se sono presenti vincitori allora il guadagno viene suddiviso
+		if(numero_vincitori > 0){
+			double gain = (double)(somma_vincita_totale)/(somma_puntate_vincitrici);
+			for(int i = 0; i < numero_vincitori; i++){
+				System.out.println("Il giocatore: ["+vincitori.get(i)+"] ha vinto: ["+(int)(gain*puntate_vincitori.get(i))+"]");
+			}
+			
+		//Altrimenti non ci sono vincitori 
+		} else {
+			System.out.println("Non ci sono vincitori!");
+		}
+
+end
+
+
+
+
+
+
+
+
+
+
+
